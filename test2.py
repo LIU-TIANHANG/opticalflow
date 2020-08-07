@@ -1,0 +1,53 @@
+import cv2
+import numpy as np
+
+video = cv2.VideoCapture("Plate2Colour.mp4")
+
+_, first_frame = video.read()
+cv2.imshow("Frame", first_frame)
+x = 300
+y = 305
+width = 100
+height = 115
+rectx1,rectx2,recty1,recty2 = 0,0,0,0
+def select_point(event, x1, y1, flags, params):
+	global x,y,width,height
+	if event == cv2.EVENT_LBUTTONDOWN:
+		x,y = x1,y1
+		rectx1,recty1 = x1,y1
+	if event == cv2.EVENT_LBUTTONUP:
+		width = x1-x
+		height = y1 -y
+		rectx2,recty2 = x1,y1
+		cv2.rectangle(first_frame,(x,y),(x1,y1),(0,0,255),2)
+		print(x,y,width,height)
+
+cv2.namedWindow("Frame")
+cv2.setMouseCallback("Frame", select_point)
+cv2.waitKey(0)
+
+roi = first_frame[y: y + height, x: x + width]
+hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+roi_hist = cv2.calcHist([hsv_roi], [0], None, [180], [0, 180])
+roi_hist = cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
+
+term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1)
+
+while True:
+	_, frame = video.read()
+	hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+	mask = cv2.calcBackProject([hsv], [0], roi_hist, [0, 180], 1)
+	cv2.rectangle(frame, (rectx1, recty1), (rectx2, recty2), (0, 0, 255), 2)
+	_, track_window = cv2.meanShift(mask, (x, y, width, height), term_criteria)
+	x, y, w, h = track_window
+	cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+	cv2.imshow("Mask", mask)
+	cv2.imshow("Frame", frame)
+
+	key = cv2.waitKey(60)
+	if key == 27:
+		break
+
+video.release()
+cv2.destroyAllWindows()
